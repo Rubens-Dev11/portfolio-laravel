@@ -1,22 +1,45 @@
-# Utilise une image Laravel avec PHP, Composer, Node.js
-FROM bitnami/laravel:10
+# Étape 1 : Base PHP avec les extensions nécessaires
+FROM php:8.2-fpm
 
-# Copie tous les fichiers du projet dans le conteneur
-COPY . /app
+# Installer les dépendances système + pdo_pgsql
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpng-dev \
+    libjpeg-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    unzip \
+    curl \
+    git \
+    libpq-dev \
+    libzip-dev \
+    default-mysql-client \
+    libmysqlclient-dev \
+    libcurl4-openssl-dev \
+    && docker-php-ext-install pdo pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip
 
-# Définit le dossier de travail
-WORKDIR /app
+# Installer Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Donne les bonnes permissions
-RUN chown -R bitnami:bitnami /app && chmod -R 775 /app/storage /app/bootstrap/cache
+# Copier le code
+COPY . /var/www
 
-# Installe les dépendances
+# Définir le dossier de travail
+WORKDIR /var/www
+
+# Définir les permissions
+RUN chown -R www-data:www-data /var/www && chmod -R 755 /var/www/storage /var/www/bootstrap/cache
+
+# Lancer les commandes de build Laravel
 RUN composer install --no-interaction --prefer-dist --optimize-autoloader \
-    && npm install \
-    && npm run build
+    && php artisan config:clear \
+    && php artisan route:clear \
+    && php artisan view:clear \
+    && php artisan migrate --force
 
-# Expose le port Laravel
+# Port à exposer
 EXPOSE 8000
 
-# Commande de démarrage
+# Démarrer Laravel
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
